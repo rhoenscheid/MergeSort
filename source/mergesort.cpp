@@ -53,6 +53,9 @@ int main(int argc, char** argv) {
     int num_proc;
     MPI_Comm_size(MPI_COMM_WORLD, &num_proc);
 
+    int listSize = 256/num_proc; // I am cheating here because I don't want to send another message communicating the size in this simple example. 
+    double sub_list[listSize]; // Only needs to be big enough to hold our sub list 
+
     if (process_id == 0)
     {
         const int N = 256;
@@ -116,8 +119,6 @@ int main(int argc, char** argv) {
     }
     else
     {
-        int listSize = 256/num_proc; // I am cheating here because I don't want to send another message communicating the size in this simple example. 
-        double sub_list[listSize]; // Only needs to be big enough to hold our sub list 
         MPI_Recv(sub_list,
                  listSize,
                  MPI_DOUBLE,
@@ -128,14 +129,37 @@ int main(int argc, char** argv) {
         printf("Process %d received a list starting with %f\n", process_id, sub_list[0]);
         
         std::sort(sub_list, sub_list+listSize);
-        
-        MPI_Send(sub_list,
-                 listSize, 
+    }
+
+    for(int i = 0; i < static_cast<int>(std::sqrt(num_proc)); i++){
+
+        if(static_cast<int>((process_id / pow(2, i))) % 2 == 0){
+            MPI_Recv(sub_list,
+                 listSize,
                  MPI_DOUBLE,
                  0,
+                 0,
+                 MPI_COMM_WORLD,
+                 MPI_STATUS_IGNORE);
+            printf("Process %d received a list starting with %f\n", process_id, sub_list[0]);
+            std::sort(sub_list, sub_list+listSize);
+            merge()
+        }
+        if(static_cast<int>(((process_id + 1) / pow(2, i))) % 2 == 0){
+            
+            int receiver = process_id - pow(2, i);
+
+            MPI_Send(sub_list,
+                 listSize, 
+                 MPI_DOUBLE,
+                 receiver,
                  1,
                  MPI_COMM_WORLD);
+        }
+
     }
+
+   
 
     MPI_Finalize();
 }
